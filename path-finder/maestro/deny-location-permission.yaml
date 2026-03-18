@@ -1,0 +1,82 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# PathFinder — Edge Case: Deny Location Permission
+#
+# Flow:
+#   1. Launch the app with a clean state
+#   2. Explicitly DENY the system location permission prompt
+#   3. Assert the fallback UI is shown ("Location Access Required")
+#   4. Attempt to tap "Start Tracking" — assert it is blocked
+#   5. Assert the reminder message is visible
+#   6. Tap "Open Settings" — assert the OS settings screen opens
+# ─────────────────────────────────────────────────────────────────────────────
+
+appId: com.anonymous.pathfinder
+name: "Deny Location Permission — Graceful Fallback"
+
+---
+- launchApp:
+    clearState: true
+- waitForAnimationToEnd
+- tapOn: "http://10.0.2.2:8081"
+- waitForAnimationToEnd
+- tapOn: "Continue"
+- waitForAnimationToEnd
+
+# ── 1. Deny the system permission prompt ─────────────────────────────────────
+# iOS
+- runFlow:
+      when:
+          visible: "Don't Allow"
+      commands:
+          - tapOn: "Don't Allow"
+
+# Android
+- runFlow:
+      when:
+          visible: "Deny"
+      commands:
+          - tapOn: "Deny"
+
+# ── 2. Assert fallback UI is displayed ───────────────────────────────────────
+- waitForAnimationToEnd
+- assertVisible:
+      text: "Location Access Required"
+
+- assertVisible: "PathFinder needs your location"
+- assertVisible: "Open Settings"
+- assertVisible: "Try Again"
+
+# ── 3. Assert "Start Tracking" button is NOT visible ─────────────────────────
+# The map screen should be fully replaced by the permission overlay,
+# so the tracking button must not be reachable.
+- assertNotVisible: "Start Tracking"
+
+# ── 4. Tap "Try Again" — should re-trigger the permission request ─────────────
+- tapOn: "Try Again"
+
+# On a real device the OS will not re-prompt after a denial (shows settings).
+# On simulator it may re-prompt. Either way, fallback UI must remain visible
+# if permission is still denied.
+- runFlow:
+      when:
+          visible: "Don't Allow"
+      commands:
+          - tapOn: "Don't Allow"
+
+- runFlow:
+      when:
+          visible: "Deny"
+      commands:
+          - tapOn: "Deny"
+
+- waitForAnimationToEnd
+- assertVisible:
+      text: "Location Access Required"
+
+# ── 5. Tap "Open Settings" ────────────────────────────────────────────────────
+- tapOn: "Open Settings"
+
+# Assert we left the app (Settings opened). Maestro detects the app moved
+# to background — we just verify PathFinder is no longer in foreground.
+- assertNotVisible: "PathFinder needs your location"

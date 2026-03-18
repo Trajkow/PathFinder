@@ -1,0 +1,135 @@
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PathFinder — Happy Path: Allow Location & Track a Route
+#
+# Flow:
+#   1. Launch the app
+#   2. Grant the system location permission prompt
+#   3. Wait for the map to be ready
+#   4. Tap "Start Tracking"
+#   5. Simulate a GPS walk via injected location updates
+#   6. Tap "Stop & Save"
+#   7. Assert the success alert appears
+#   8. Assert the activity is saved (navigate to History and verify)
+# ─────────────────────────────────────────────────────────────────────────────
+
+appId: com.anonymous.pathfinder
+name: "Allow Location & Track a Route"
+
+---
+- setLocation:
+        latitude: 41.99646
+        longitude: 21.43141
+
+- launchApp:
+      clearState: true
+- waitForAnimationToEnd
+- tapOn: "http://10.0.2.2:8081"
+- waitForAnimationToEnd
+- tapOn: "Continue"
+- waitForAnimationToEnd
+
+# ── 1. Handle the system location permission prompt ──────────────────────────
+
+- runFlow:
+      when:
+          visible: "Allow While Using App"
+      commands:
+          - tapOn: "Allow While Using App"
+
+- runFlow:
+      when:
+          visible: "While using the app"
+      commands:
+          - tapOn: "While using the app"
+
+- runFlow:
+      when:
+          visible: "Precise"
+      commands:
+          - tapOn: "Keep My Current Selection"
+
+# ── 2. Wait for the map screen to be ready ───────────────────────────────────
+- waitForAnimationToEnd
+- assertNotVisible: "Finding your location…"
+- assertNotVisible: "Location Access Required"
+
+# ── 3. Start Tracking ────────────────────────────────────────────────────────
+- assertVisible: "Start Tracking"
+- tapOn: "Start Tracking"
+
+- waitForAnimationToEnd
+- assertVisible:
+      id: "stats-hud"
+
+# ── 4. Simulate GPS movement (short walk ~400 m) ─────────────────────────────
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99646
+      longitude: 21.43141
+
+
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99658
+      longitude: 21.43167
+
+
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99671
+      longitude: 21.43198
+
+
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99689
+      longitude: 21.43224
+
+
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99704
+      longitude: 21.43251
+
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99718
+      longitude: 21.43279
+
+
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99733
+      longitude: 21.43305
+
+
+- waitForAnimationToEnd
+- setLocation:
+      latitude: 41.99747
+      longitude: 21.43332
+
+
+# ── 5. Stop & Save ───────────────────────────────────────────────────────────
+- assertVisible: "Stop & Save"
+- tapOn: "Stop & Save"
+
+# ── 6. Assert success alert ──────────────────────────────────────────────────
+- waitForAnimationToEnd
+- assertVisible:
+      text: "Route saved"
+
+- assertVisible: "km saved to your History"
+
+- tapOn: "Great!"
+
+# ── 7. Verify activity appears in History ────────────────────────────────────
+- tapOn: "History"
+
+- waitForAnimationToEnd
+- assertVisible:
+      id: "history-list"
+
+- assertVisible:
+      text: "0."
+      enabled: true

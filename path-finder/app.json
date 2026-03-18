@@ -9,7 +9,17 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "entitlements": {
+        "com.apple.Maps": true
+      },
+      "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "bundleIdentifier": "com.anonymous.pathfinder"
     },
     "android": {
       "adaptiveIcon": {
@@ -19,7 +29,14 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.anonymous.pathfinder",
+      "jsEngine": "hermes",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyA0Bzu1D8SXrEPgxz4ZUXU6wG02E_oS92I"
+        }
+      }
     },
     "web": {
       "output": "static",
@@ -43,6 +60,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "7af364e5-fed2-429c-9ce9-89b34b3d8a8a"
+      }
     }
   }
 }

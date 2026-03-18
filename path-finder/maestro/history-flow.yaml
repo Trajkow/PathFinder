@@ -1,0 +1,99 @@
+---
+# ─────────────────────────────────────────────────────────────────────────────
+# PathFinder — History & Detail View Flow
+#
+# Prerequisites:
+#   Run allow-location-tracking.yaml first so at least one activity exists.
+#   Or use Maestro's runFlow to chain them.
+#
+# Flow:
+#   1. Launch app (preserving state so saved activity exists)
+#   2. Navigate to the History tab
+#   3. Assert the grouped list renders with at least one item
+#   4. Tap the first activity item
+#   5. Assert the Detail View screen opens
+#   6. Assert the static map and route metadata are visible
+#   7. Navigate back and assert we return to the list
+# ─────────────────────────────────────────────────────────────────────────────
+
+appId: com.pathfinder.app
+name: "History & Detail View"
+onFlowStart:
+      - runFlow:
+            commands:
+                  - evalScript:
+                        ${maestro.shell('adb shell pm revoke com.anonymous.pathfinder android.permission.ACCESS_FINE_LOCATION')}
+                  - evalScript:
+                        ${maestro.shell('adb shell pm revoke com.anonymous.pathfinder android.permission.ACCESS_COARSE_LOCATION')}
+---
+# Run the tracking flow first to guarantee a saved activity exists
+- runFlow: allow-location-tracking.yaml
+
+# ── 1. Navigate to History tab ───────────────────────────────────────────────
+- tapOn: "History"
+
+- waitForAnimationToEnd:
+      wait: 3000
+
+# ── 2. Assert the list renders ───────────────────────────────────────────────
+- assertVisible:
+      id: "history-list"
+      wait: 4000
+
+# At least one row must exist after our tracking flow
+- assertVisible:
+      id: "activity-row-0"
+      wait: 3000
+
+# Assert the grouped section header shows today's date
+- assertVisible:
+      text: "Today"
+      enabled: true
+
+# Assert distance and duration metadata are visible in the row
+- assertVisible: "km"
+
+# ── 3. Tap the first activity ────────────────────────────────────────────────
+- tapOn:
+      id: "activity-row-0"
+
+- waitForAnimationToEnd:
+      wait: 2000
+
+# ── 4. Assert Detail View screen ─────────────────────────────────────────────
+- assertVisible:
+      id: "detail-screen"
+      wait: 3000
+
+# Static map must be rendered
+- waitForAnimationToEnd
+- assertVisible:
+      id: "detail-map"
+
+# Route polyline container must exist
+- assertVisible:
+      id: "detail-polyline"
+
+# Metadata section — distance and duration
+- assertVisible:
+      id: "detail-distance"
+
+- assertVisible:
+      id: "detail-duration"
+
+# Date string must be present
+- assertVisible: "km"
+
+# ── 5. Navigate back ──────────────────────────────────────────────────────────
+- back
+
+- waitForAnimationToEnd:
+      wait: 1500
+
+# Assert we returned to the History list
+- assertVisible:
+      id: "history-list"
+      timeout: 3000
+
+- assertNotVisible:
+      id: "detail-screen"

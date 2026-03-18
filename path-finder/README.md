@@ -1,50 +1,93 @@
-# Welcome to your Expo app 👋
+# PathFinder 🗺️
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A privacy-first route tracking app built with **React Native (Expo)**, **MapTiler**, and **SQLite**. Record outdoor walks and runs with real-time GPS tracking, view your history, and revisit routes — all data stays on-device.
 
-## Get started
+## Tech Stack
 
-1. Install dependencies
+| Layer | Technology |
+|---|---|
+| Framework | Expo SDK 54 / React Native 0.81 |
+| Navigation | expo-router (file-based) |
+| Styling | NativeWind 4 (Tailwind CSS) |
+| State | Zustand |
+| Persistence | expo-sqlite (WAL mode) |
+| Maps | react-native-maps + MapTiler tiles |
+| Location | expo-location (foreground + background) |
+| Animations | react-native-reanimated |
+| Testing | Maestro (E2E UI flows) |
 
+## Getting Started
+
+1. **Install dependencies**
    ```bash
    npm install
    ```
 
-2. Start the app
+2. **Configure environment variables**
 
+   Create a `.env` file in the project root:
+   ```env
+   EXPO_PUBLIC_MAPTILER_KEY=your_maptiler_key
+   EXPO_PUBLIC_GOOGLE_MAPS_KEY=your_google_maps_key
+   ```
+
+3. **Run the app**
    ```bash
    npx expo start
    ```
+   - Scan the QR code → Expo Go on a physical device
+   - Press **i** → iOS Simulator
+   - Press **a** → Android Emulator
 
-In the output, you'll find options to open the app in a
+> **Note:** Native features (background location, Google Maps on Android) require a development build:
+> ```bash
+> npx expo run:android   # or npx expo run:ios
+> ```
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+## Project Structure
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+```
+app/
+├── (tabs)/
+│   ├── index.tsx        # Map screen — live tracking + controls
+│   └── history.tsx      # Activity history list
+├── activity/[id].tsx    # Route detail modal with static map
+└── _layout.tsx          # Root navigation stack
 
-## Get a fresh project
+components/
+├── map/MapDisplay.tsx   # Full-screen MapView with UrlTile overlay
+└── ui/                  # Shared UI primitives
 
-When you're ready, run:
+hooks/
+├── useLocation.ts       # Permission flow + one-shot GPS fix
+└── useTracking.ts       # Real-time GPS watcher (fg + bg)
 
-```bash
-npm run reset-project
+store/
+├── trackingStore.ts     # Live session state + Haversine distance
+└── historyStore.ts      # Persisted activities from SQLite
+
+services/
+└── db.ts                # SQLite repository (migrations, CRUD)
+
+types/
+└── activity.ts          # Shared domain types
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## E2E Testing
 
-## Learn more
+Maestro flows live in `.maestro/`:
 
-To learn more about developing your project with Expo, look at the following resources:
+```bash
+maestro test .maestro/
+```
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+| Flow | Description |
+|---|---|
+| `allow-location-tracking.yaml` | Grant permissions → track → save |
+| `deny-location-permission.yaml` | Deny permissions → assert fallback UI |
+| `history-flow.yaml` | Navigate history → open detail view |
 
-## Join the community
+## AI Assistance & Challenges
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Built with the assistance of **Gemini 3.1 Pro** and **Claude Sonnet 4.6**.
+- **Challenges:** I didn't face any major challenges with the given project. The integration between Expo, SQLite, and NativeWind was straightforward and worked smoothly.

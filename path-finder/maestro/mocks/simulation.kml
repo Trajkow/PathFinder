@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2"
+     xmlns:gx="http://www.google.com/kml/ext/2.2">
+
+  <Document>
+    <name>PathFinder Short Walk Simulation</name>
+    <description>
+      ~400 m simulated walk through Ohrid, North Macedonia.
+      Coordinates match simulation.gpx and allow-location-tracking.yaml.
+      Format: longitude,latitude,altitude
+    </description>
+
+    <!-- ── Styles ──────────────────────────────────────────────────────── -->
+    <Style id="routeLine">
+      <LineStyle>
+        <!-- iOS blue — matches PathFinder polyline colour -->
+        <color>ffff7a00</color>
+        <width>4</width>
+      </LineStyle>
+    </Style>
+
+    <Style id="startPin">
+      <IconStyle>
+        <color>ff00ff00</color>
+        <scale>1.2</scale>
+      </IconStyle>
+    </Style>
+
+    <Style id="endPin">
+      <IconStyle>
+        <color>ff0000ff</color>
+        <scale>1.2</scale>
+      </IconStyle>
+    </Style>
+
+    <!-- ── Placemarks ─────────────────────────────────────────────────── -->
+    <Placemark>
+      <name>Start</name>
+      <styleUrl>#startPin</styleUrl>
+      <Point>
+        <coordinates>21.43141,41.99646,693.4</coordinates>
+      </Point>
+    </Placemark>
+
+    <Placemark>
+      <name>End</name>
+      <styleUrl>#endPin</styleUrl>
+      <Point>
+        <coordinates>21.43332,41.99747,695.6</coordinates>
+      </Point>
+    </Placemark>
+
+    <!-- ── Route LineString ───────────────────────────────────────────── -->
+    <Placemark>
+      <name>Maestro Simulation Walk</name>
+      <description>Short walk — 8 GPS points — approx 400 m</description>
+      <styleUrl>#routeLine</styleUrl>
+      <LineString>
+        <tessellate>1</tessellate>
+        <altitudeMode>clampToGround</altitudeMode>
+        <coordinates>
+          21.43141,41.99646,693.4
+          21.43167,41.99658,693.8
+          21.43198,41.99671,694.2
+          21.43224,41.99689,694.5
+          21.43251,41.99704,694.9
+          21.43279,41.99718,695.1
+          21.43305,41.99733,695.3
+          21.43332,41.99747,695.6
+        </coordinates>
+      </LineString>
+    </Placemark>
+
+    <!-- ── Timestamped track (gx extension for animation) ────────────── -->
+    <Placemark>
+      <name>Animated Track</name>
+      <gx:Track>
+        <altitudeMode>clampToGround</altitudeMode>
+        <when>2026-03-18T09:00:00Z</when>
+        <when>2026-03-18T09:00:15Z</when>
+        <when>2026-03-18T09:00:30Z</when>
+        <when>2026-03-18T09:00:45Z</when>
+        <when>2026-03-18T09:01:00Z</when>
+        <when>2026-03-18T09:01:15Z</when>
+        <when>2026-03-18T09:01:30Z</when>
+        <when>2026-03-18T09:01:45Z</when>
+        <gx:coord>21.43141 41.99646 693.4</gx:coord>
+        <gx:coord>21.43167 41.99658 693.8</gx:coord>
+        <gx:coord>21.43198 41.99671 694.2</gx:coord>
+        <gx:coord>21.43224 41.99689 694.5</gx:coord>
+        <gx:coord>21.43251 41.99704 694.9</gx:coord>
+        <gx:coord>21.43279 41.99718 695.1</gx:coord>
+        <gx:coord>21.43305 41.99733 695.3</gx:coord>
+        <gx:coord>21.43332 41.99747 695.6</gx:coord>
+      </gx:Track>
+    </Placemark>
+
+  </Document>
+</kml>

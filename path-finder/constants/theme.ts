@@ -5,25 +5,25 @@
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#0a7ea4';
-const tintColorDark = '#fff';
+// PathFinder brand accent — iOS blue for map & UI chrome
+const ACCENT = '#007AFF';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    background: '#fff',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
+    text: '#1C1C1E',
+    background: '#F2F2F7',
+    tint: ACCENT,
+    icon: '#8E8E93',
+    tabIconDefault: '#8E8E93',
+    tabIconSelected: ACCENT,
   },
   dark: {
-    text: '#ECEDEE',
-    background: '#151718',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#EBEBF5',
+    background: '#000000',
+    tint: ACCENT,
+    icon: '#636366',
+    tabIconDefault: '#636366',
+    tabIconSelected: ACCENT,
   },
 };
 

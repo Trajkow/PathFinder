@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1"
+     creator="PathFinder QA — Maestro Mock"
+     xmlns="http://www.topografix.com/GPX/1/1"
+     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+     xsi:schemaLocation="http://www.topografix.com/GPX/1/1
+       http://www.topografix.com/GPX/1/1/gpx.xsd">
+
+  <metadata>
+    <name>PathFinder Short Walk Simulation</name>
+    <desc>
+      A ~400 m simulated walk through Ohrid, North Macedonia.
+      Used by Maestro setLocation commands in allow-location-tracking.yaml.
+    </desc>
+    <time>2026-03-18T09:00:00Z</time>
+  </metadata>
+
+  <trk>
+    <name>Maestro Simulation Walk</name>
+    <trkseg>
+      <!-- Point 1 — Start -->
+      <trkpt lat="41.99646" lon="21.43141">
+        <ele>693.4</ele>
+        <time>2026-03-18T09:00:00Z</time>
+        <hdop>1.2</hdop>
+        <desc>Start point</desc>
+      </trkpt>
+
+      <!-- Point 2 -->
+      <trkpt lat="41.99658" lon="21.43167">
+        <ele>693.8</ele>
+        <time>2026-03-18T09:00:15Z</time>
+        <hdop>1.1</hdop>
+      </trkpt>
+
+      <!-- Point 3 -->
+      <trkpt lat="41.99671" lon="21.43198">
+        <ele>694.2</ele>
+        <time>2026-03-18T09:00:30Z</time>
+        <hdop>1.0</hdop>
+      </trkpt>
+
+      <!-- Point 4 -->
+      <trkpt lat="41.99689" lon="21.43224">
+        <ele>694.5</ele>
+        <time>2026-03-18T09:00:45Z</time>
+        <hdop>1.1</hdop>
+      </trkpt>
+
+      <!-- Point 5 -->
+      <trkpt lat="41.99704" lon="21.43251">
+        <ele>694.9</ele>
+        <time>2026-03-18T09:01:00Z</time>
+        <hdop>1.2</hdop>
+      </trkpt>
+
+      <!-- Point 6 -->
+      <trkpt lat="41.99718" lon="21.43279">
+        <ele>695.1</ele>
+        <time>2026-03-18T09:01:15Z</time>
+        <hdop>1.0</hdop>
+      </trkpt>
+
+      <!-- Point 7 -->
+      <trkpt lat="41.99733" lon="21.43305">
+        <ele>695.3</ele>
+        <time>2026-03-18T09:01:30Z</time>
+        <hdop>1.1</hdop>
+      </trkpt>
+
+      <!-- Point 8 — End -->
+      <trkpt lat="41.99747" lon="21.43332">
+        <ele>695.6</ele>
+        <time>2026-03-18T09:01:45Z</time>
+        <hdop>1.2</hdop>
+        <desc>End point — approx 400 m from start</desc>
+      </trkpt>
+    </trkseg>
+  </trk>
+
+</gpx>
