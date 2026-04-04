@@ -12,7 +12,7 @@ import React, {
   useState,
 } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_DEFAULT, UrlTile, type Region } from 'react-native-maps';
+import MapView, { Polyline, PROVIDER_DEFAULT, UrlTile, type Region } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -140,14 +140,6 @@ const OverlayView = memo(({
 ));
 OverlayView.displayName = 'OverlayView';
 
-const UserMarker = memo(() => (
-  <View style={styles.markerOuter}>
-    <View style={styles.markerInner} />
-  </View>
-));
-UserMarker.displayName = 'UserMarker';
-
-const MARKER_ANCHOR = { x: 0.5, y: 0.5 } as const;
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -240,7 +232,8 @@ export const MapDisplay = forwardRef<MapDisplayRef>((_, ref) => {
         style={styles.map}
         mapType="none"
         initialRegion={initialRegion}
-        showsUserLocation={false}
+        showsUserLocation={true}
+        followsUserLocation={false}
         showsMyLocationButton={false}
         showsPointsOfInterest={false}
         showsBuildings={false}
@@ -257,17 +250,11 @@ export const MapDisplay = forwardRef<MapDisplayRef>((_, ref) => {
           urlTemplate={MAPTILER_URL}
           maximumZ={MARKER_MAX_ZOOM}
           tileSize={MARKER_TILE_SIZE}
-          zIndex={1}
+          zIndex={-1}
         />
 
         {hasRoute && (
           <Polyline coordinates={routeCoordinates} {...POLYLINE_STYLE} />
-        )}
-
-        {currentLocation && (
-          <Marker coordinate={currentLocation} anchor={MARKER_ANCHOR} tracksViewChanges={false}>
-            <UserMarker />
-          </Marker>
         )}
       </MapView>
 
@@ -276,6 +263,7 @@ export const MapDisplay = forwardRef<MapDisplayRef>((_, ref) => {
           <StatsHUD startTime={startTime} distanceMeters={totalDistanceMeters} />
         </View>
       )}
+
     </View>
   );
 });
@@ -350,24 +338,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F3F4F6',
   },
   secondaryBtnText: { color: '#374151', fontSize: 16, fontWeight: '500' },
-
-  // ── Marker
-  markerOuter: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(59,130,246,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  markerInner: {
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#3B82F6',
-    borderWidth: 2.5,
-    borderColor: '#FFFFFF',
-  },
 
   // ── HUD
   hudWrapper: {

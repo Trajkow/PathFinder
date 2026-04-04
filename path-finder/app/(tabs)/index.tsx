@@ -1,5 +1,6 @@
 import { MapDisplay, type MapDisplayRef } from '@/components/map/MapDisplay';
 import { useTracking } from '@/hooks/useTracking';
+import { useTrackingDraft } from '@/hooks/useTrackingDraft';
 import { saveActivity } from '@/services/db';
 import { useTrackingStore } from '@/store/trackingStore';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,8 +21,9 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const AnimatedView = Animated.createAnimatedComponent(View);
 
 export default function MapScreen() {
-  // Activate real-time tracker
+  // Activate real-time tracker + draft persistence
   useTracking();
+  useTrackingDraft();
 
   const insets = useSafeAreaInsets();
 

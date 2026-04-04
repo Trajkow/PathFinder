@@ -11,12 +11,12 @@
  */
 
 import * as SQLite from 'expo-sqlite';
-import type { Activity } from '@/types/activity';
+import type { Activity, Coordinate } from '@/types/activity';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DB_NAME = 'pathfinder_v2.db';
-const CURRENT_MIGRATION = 2;
+const CURRENT_MIGRATION = 3;
 
 // ─── Connection ───────────────────────────────────────────────────────────────
 
@@ -55,7 +55,7 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
   );
   const appliedVersion = row?.version ?? 0;
 
-  if (appliedVersion < CURRENT_MIGRATION) {
+  if (appliedVersion < 2) {
     await db.execAsync(`DROP TABLE IF EXISTS activities;`);
     await db.execAsync(`
       CREATE TABLE activities (
@@ -70,7 +70,21 @@ async function migrate(db: SQLite.SQLiteDatabase): Promise<void> {
     `);
     await db.runAsync(
       'INSERT OR IGNORE INTO _migrations (version) VALUES (?);',
-      CURRENT_MIGRATION,
+      2,
+    );
+  }
+
+  // Migration 3: add tracking_draft KV table (non-destructive)
+  if (appliedVersion < 3) {
+    await db.execAsync(`
+      CREATE TABLE IF NOT EXISTS tracking_draft (
+        key   TEXT PRIMARY KEY NOT NULL,
+        value TEXT NOT NULL
+      );
+    `);
+    await db.runAsync(
+      'INSERT OR IGNORE INTO _migrations (version) VALUES (?);',
+      3,
     );
   }
 }
@@ -148,7 +162,8 @@ export async function getAllActivities(): Promise<Activity[]> {
     duration: r.duration,
     totalDistance: r.total_distance,
     coordinatesJson: r.coordinates_json,
-  }));
+  })
+  );
 }
 
 /**
@@ -159,4 +174,92 @@ export async function deleteActivity(id: string): Promise<boolean> {
   const db = await getDb();
   const result = await db.runAsync('DELETE FROM activities WHERE id = ?;', id);
   return result.changes > 0;
+}
+
+// ─── Tracking Draft ───────────────────────────────────────────────────────────
+
+/**
+ * In-progress session snapshot persisted to SQLite so it survives
+ * an Android process kill (e.g. permission revocation).
+ */
+export interface TrackingDraft {
+  /** ISO 8601 — when the tracking session originally started. */
+  startTime: string;
+  /** All coordinates captured so far. */
+  routeCoordinates: Coordinate[];
+  /** Accumulated distance in metres. */
+  totalDistanceMeters: number;
+  /** ISO 8601 — when this snapshot was last flushed to disk. */
+  savedAt: string;
+}
+
+/**
+ * Persists a snapshot of the current tracking session.
+ * Uses INSERT OR REPLACE so each key is upserted atomically.
+ */
+export async function saveDraft(draft: TrackingDraft): Promise<void> {
+  const db = await getDb();
+
+  const entries: Array<[string, string]> = [
+    ['startTime', draft.startTime],
+    ['routeCoordinates', JSON.stringify(draft.routeCoordinates)],
+    ['totalDistanceMeters', String(draft.totalDistanceMeters)],
+    ['savedAt', draft.savedAt],
+  ];
+
+  // Batch upsert inside a single transaction for atomicity.
+  await db.withTransactionAsync(async () => {
+    for (const [key, value] of entries) {
+      await db.runAsync(
+        'INSERT OR REPLACE INTO tracking_draft (key, value) VALUES (?, ?);',
+        key,
+        value,
+      );
+    }
+  });
+}
+
+/**
+ * Loads the persisted draft session, if any.
+ * Returns `null` when no draft is stored.
+ */
+export async function loadDraft(): Promise<TrackingDraft | null> {
+  const db = await getDb();
+
+  const rows = await db.getAllAsync<{ key: string; value: string }>(
+    'SELECT key, value FROM tracking_draft;',
+  );
+
+  if (rows.length === 0) return null;
+
+  const map = new Map(rows.map((r) => [r.key, r.value]));
+
+  const startTime = map.get('startTime');
+  const coordsJson = map.get('routeCoordinates');
+  const distStr = map.get('totalDistanceMeters');
+  const savedAt = map.get('savedAt');
+
+  // All four keys are required for a valid draft.
+  if (!startTime || !coordsJson || !distStr || !savedAt) return null;
+
+  try {
+    return {
+      startTime,
+      routeCoordinates: JSON.parse(coordsJson) as Coordinate[],
+      totalDistanceMeters: Number(distStr),
+      savedAt,
+    };
+  } catch {
+    // Corrupt JSON — discard the draft.
+    await clearDraft();
+    return null;
+  }
+}
+
+/**
+ * Removes the persisted draft. Called after recovery or discard.
+ */
+export async function clearDraft(): Promise<void> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM tracking_draft;');
 }

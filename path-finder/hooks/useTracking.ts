@@ -1,16 +1,12 @@
 /**
  * useTracking — Real-time GPS tracking via expo-location.
  *
- * Fixes applied (v2):
- * - Read `addCoordinate` imperatively via `getState()` inside the location
- *   callback. This removes it from the useEffect dependency array and prevents
- *   the watcher from being torn down + rebuilt every render.
- * - Wrap `requestBackgroundPermissionsAsync` in a try/catch that can never
- *   surface-throw, so a permission denial can never block the foreground watcher.
- * - Drop accuracy from `BestForNavigation` → `High` for reliable updates on
- *   real devices and emulators. `BestForNavigation` requires an extremely strong
- *   GPS signal and produces zero updates indoors / in simulators.
- * - Reduced `distanceInterval` to 1 m so movement is captured immediately.
+ * v3 – Heartbeat monitor:
+ * - Detects mid-session permission revocation or GPS loss by monitoring
+ *   a heartbeat timestamp updated on every watcher callback.
+ * - If no GPS update arrives within HEARTBEAT_TIMEOUT_MS, the session
+ *   is auto-paused via `pauseTracking(reason)` — route data is preserved.
+ * - Resuming (isPaused → false) restarts the watcher automatically.
  *
  * ⚠️  Background location requires a native rebuild (expo run:android /
  *     expo run:ios). It will NOT work in Expo Go.
@@ -22,6 +18,7 @@ import type { LocationObject } from 'expo-location';
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
 import { useEffect, useRef } from 'react';
+import { Alert } from 'react-native';
 
 // ─── Background task ──────────────────────────────────────────────────────────
 
@@ -65,60 +62,154 @@ const FOREGROUND_ACCURACY = Location.Accuracy.High;
  */
 const DISTANCE_INTERVAL_M = 1;
 
+/** If no GPS update arrives within this window, trigger an auto-pause. */
+const HEARTBEAT_TIMEOUT_MS = 8_000;
+
+/** How often the heartbeat interval fires to check for watcher silence. */
+const HEARTBEAT_CHECK_INTERVAL_MS = 3_000;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Determines a user-friendly reason for the pause by checking permission
+ * and Location Services status.
+ */
+async function determinePauseReason(): Promise<string> {
+  try {
+    const { status } = await Location.getForegroundPermissionsAsync();
+    if (status !== Location.PermissionStatus.GRANTED) {
+      return 'Location permission was revoked. Open Settings to re-enable it.';
+    }
+
+    const servicesEnabled = await Location.hasServicesEnabledAsync();
+    if (!servicesEnabled) {
+      return 'Location services were disabled. Please re-enable GPS.';
+    }
+  } catch {
+    // Defensive — never let a diagnostic call crash tracking.
+  }
+
+  return 'GPS signal lost. Move to an area with better reception or check your settings.';
+}
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 /**
- * Subscribes to `watchPositionAsync` while `isTracking` is `true`.
- * Cleans up the subscription on stop or unmount.
+ * Subscribes to `watchPositionAsync` while `isTracking && !isPaused`.
+ * Monitors a heartbeat timestamp — if the watcher goes silent for
+ * HEARTBEAT_TIMEOUT_MS, the session is auto-paused with a descriptive reason.
+ *
+ * Resuming (`isPaused` flips to `false`) restarts the watcher automatically.
  *
  * Key design decisions:
- * - `addCoordinate` is read via `getState()` inside the callback so it never
- *   needs to be in the `useEffect` dependency array.
+ * - `addCoordinate` / `pauseTracking` are read via `getState()` inside callbacks
+ *   so they never appear in effect dependency arrays.
  * - Background permission is requested in a separate try/catch block that
  *   CANNOT prevent the foreground watcher from starting.
  */
 export function useTracking(): void {
   const isTracking = useTrackingStore((s) => s.isTracking);
+  const isPaused = useTrackingStore((s) => s.isPaused);
   const subscriptionRef = useRef<Location.LocationSubscription | null>(null);
+  const lastUpdateRef = useRef<number>(Date.now());
 
+  // ── Heartbeat monitor ───────────────────────────────────────────────────────
+  // Runs while isTracking && !isPaused. Checks every HEARTBEAT_CHECK_INTERVAL_MS
+  // whether the watcher has gone silent (no GPS update for HEARTBEAT_TIMEOUT_MS).
+  // On iOS (app stays alive after permission revocation), shows a native Alert
+  // so the user can re-request permission or stop tracking.
   useEffect(() => {
-    // ── Stop path ──────────────────────────────────────────────────────────────
-    if (!isTracking) {
+    if (!isTracking || isPaused) return;
+
+    const id = setInterval(async () => {
+      const silenceMs = Date.now() - lastUpdateRef.current;
+      const { isTracking: stillTracking, isPaused: alreadyPaused } =
+        useTrackingStore.getState();
+
+      if (stillTracking && !alreadyPaused && silenceMs > HEARTBEAT_TIMEOUT_MS) {
+        console.warn(
+          `[PathFinder] Heartbeat timeout — no GPS update for ${silenceMs}ms. Auto-pausing.`,
+        );
+        const reason = await determinePauseReason();
+        // Re-check: the state may have changed while we awaited.
+        const current = useTrackingStore.getState();
+        if (current.isTracking && !current.isPaused) {
+          current.pauseTracking(reason);
+
+          // Show a native alert so the user can act (especially on iOS).
+          Alert.alert(
+            'Tracking Paused',
+            reason,
+            [
+              {
+                text: 'Stop Tracking',
+                style: 'destructive',
+                onPress: () => {
+                  useTrackingStore.getState().stopTracking();
+                },
+              },
+              {
+                text: 'Allow Location',
+                style: 'default',
+                onPress: async () => {
+                  const { status } =
+                    await Location.requestForegroundPermissionsAsync();
+                  if (status === Location.PermissionStatus.GRANTED) {
+                    useTrackingStore.getState().resumeTracking();
+                  }
+                },
+              },
+            ],
+            { cancelable: false },
+          );
+        }
+      }
+    }, HEARTBEAT_CHECK_INTERVAL_MS);
+
+    return () => clearInterval(id);
+  }, [isTracking, isPaused]);
+
+  // ── Watcher lifecycle ───────────────────────────────────────────────────────
+  useEffect(() => {
+    // ── Stop / pause path ─────────────────────────────────────────────────────
+    if (!isTracking || isPaused) {
       subscriptionRef.current?.remove();
       subscriptionRef.current = null;
 
-      // Best-effort: stop background task if it was running.
-      Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
-        .then((running) => {
-          if (running) {
-            Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => { });
-          }
-        })
-        .catch(() => { });
+      // When fully stopped (not just paused), clean up the background task.
+      if (!isTracking) {
+        Location.hasStartedLocationUpdatesAsync(BACKGROUND_LOCATION_TASK)
+          .then((running) => {
+            if (running) {
+              Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK).catch(() => { });
+            }
+          })
+          .catch(() => { });
+      }
 
       return;
     }
 
-    // ── Start path ─────────────────────────────────────────────────────────────
+    // ── Start / resume path ───────────────────────────────────────────────────
     let cancelled = false;
 
+    // Reset heartbeat timestamp so a stale value doesn't immediately re-pause.
+    lastUpdateRef.current = Date.now();
+
     (async () => {
-      // 1. Request background permission — isolated in its own try/catch so
-      //    a denial or Expo Go incompatibility can NEVER block step 2.
+      // 1. Passive check for background permission — never opens Settings.
+      //    Background tracking only activates if already granted.
       let bgGranted = false;
       try {
-        const { status } = await Location.requestBackgroundPermissionsAsync();
+        const { status } = await Location.getBackgroundPermissionsAsync();
         bgGranted = status === Location.PermissionStatus.GRANTED;
       } catch {
-        // Expo Go throws when background permissions API is unavailable — ignore.
         bgGranted = false;
       }
 
       if (cancelled) return;
 
       // 2. Start the foreground watcher.
-      //    `addCoordinate` is read from the store imperatively here so it is
-      //    never stale and never causes the effect to re-run.
       try {
         const sub = await Location.watchPositionAsync(
           {
@@ -126,6 +217,9 @@ export function useTracking(): void {
             distanceInterval: DISTANCE_INTERVAL_M,
           },
           (location) => {
+            // Update heartbeat timestamp on every successful fix.
+            lastUpdateRef.current = Date.now();
+
             const coord: Coordinate = {
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
@@ -133,7 +227,6 @@ export function useTracking(): void {
               timestamp: location.timestamp,
               accuracy: location.coords.accuracy,
             };
-            // Imperative read — no stale closure, no extra dependency.
             useTrackingStore.getState().addCoordinate(coord);
           },
         );
@@ -150,7 +243,7 @@ export function useTracking(): void {
         return;
       }
 
-      // 3. Start background task (native builds only — silent no-op in Expo Go).
+      // 3. Start background task (native builds only).
       if (bgGranted) {
         Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
           accuracy: FOREGROUND_ACCURACY,
@@ -161,17 +254,14 @@ export function useTracking(): void {
             notificationBody: 'Tracking is active in the background.',
             notificationColor: '#007AFF',
           },
-        }).catch(() => {
-          // TaskManager not available in Expo Go — swallow silently.
-        });
+        }).catch(() => { });
       }
     })();
 
-    // ── Cleanup ────────────────────────────────────────────────────────────────
     return () => {
       cancelled = true;
       subscriptionRef.current?.remove();
       subscriptionRef.current = null;
     };
-  }, [isTracking]); // ← addCoordinate intentionally omitted — read via getState()
+  }, [isTracking, isPaused]);
 }

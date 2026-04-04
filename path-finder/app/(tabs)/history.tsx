@@ -58,13 +58,85 @@ function EmptyState({ isDark }: { isDark: boolean }) {
   );
 }
 
+// ─── Draft card ───────────────────────────────────────────────────────────────
+
+function DraftCard({
+  isDark,
+  distanceKm,
+  points,
+  onResume,
+  onDiscard,
+}: {
+  isDark: boolean;
+  distanceKm: string;
+  points: number;
+  onResume: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <View
+      className="mx-4 mb-3 overflow-hidden rounded-2xl"
+      style={{ backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }}
+    >
+      <View className="p-4">
+        {/* Header */}
+        <View className="flex-row items-center mb-2">
+          <View className="mr-3 h-10 w-10 items-center justify-center rounded-full bg-orange-500/10">
+            <Ionicons name="warning" size={20} color="#FF9500" />
+          </View>
+          <View className="flex-1">
+            <Text
+              className="text-[17px] font-semibold"
+              style={{ color: isDark ? '#EBEBF5' : '#1C1C1E' }}
+            >
+              Unfinished Route
+            </Text>
+            <Text
+              className="text-[14px]"
+              style={{ color: isDark ? '#636366' : '#8E8E93' }}
+            >
+              {distanceKm} km · {points} points
+            </Text>
+          </View>
+        </View>
+
+        {/* Actions */}
+        <View className="flex-row gap-3 mt-2">
+          <Pressable
+            onPress={onDiscard}
+            className="flex-1 items-center py-2.5 rounded-xl"
+            style={{ backgroundColor: isDark ? '#2C2C2E' : '#F2F2F7' }}
+          >
+            <Text
+              className="text-[15px] font-semibold"
+              style={{ color: isDark ? '#EBEBF5' : '#374151' }}
+            >
+              Discard
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={onResume}
+            className="flex-1 items-center py-2.5 rounded-xl"
+            style={{ backgroundColor: '#007AFF' }}
+          >
+            <Text className="text-[15px] font-semibold text-white">
+              Resume
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+    </View>
+  );
+}
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function HistoryScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
 
-  const { activities, fetchActivities, removeActivity } = useHistoryStore();
+  const { activities, draft, fetchActivities, removeActivity, resumeDraft, discardDraft } =
+    useHistoryStore();
 
   useFocusEffect(
     useCallback(() => {
@@ -91,6 +163,27 @@ export default function HistoryScreen() {
     router.push(`/activity/${activity.id}`);
   };
 
+  const handleResumeDraft = () => {
+    resumeDraft();
+    // Navigate to the Map tab so the user sees the restored route.
+    router.replace('/(tabs)');
+  };
+
+  const handleDiscardDraft = () => {
+    Alert.alert(
+      'Discard Route',
+      'Are you sure? This unfinished route will be permanently deleted.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Discard',
+          style: 'destructive',
+          onPress: () => discardDraft(),
+        },
+      ],
+    );
+  };
+
   return (
     <SafeAreaView
       className="flex-1"
@@ -109,17 +202,28 @@ export default function HistoryScreen() {
 
       {/* ── List / Empty State ───────────────────────────────────────────── */}
       <View className="flex-1">
-        {activities.length === 0 ? (
+        {activities.length === 0 && !draft ? (
           <EmptyState isDark={isDark} />
         ) : (
           <FlatList<Activity>
             data={activities}
             keyExtractor={(item) => item.id}
             contentContainerStyle={{
-              paddingHorizontal: 16,
+              paddingHorizontal: 0,
               paddingTop: 8,
               paddingBottom: 120, // Clear floating tab bar
             }}
+            ListHeaderComponent={
+              draft ? (
+                <DraftCard
+                  isDark={isDark}
+                  distanceKm={(draft.totalDistanceMeters / 1000).toFixed(2)}
+                  points={draft.routeCoordinates.length}
+                  onResume={handleResumeDraft}
+                  onDiscard={handleDiscardDraft}
+                />
+              ) : null
+            }
             renderItem={({ item, index }: { item: Activity; index: number }) => {
               const isFirst = index === 0;
               const isLast = index === activities.length - 1;
@@ -129,7 +233,10 @@ export default function HistoryScreen() {
                   className={`overflow-hidden ${
                     isFirst ? 'rounded-t-2xl' : ''
                   } ${isLast ? 'rounded-b-2xl' : ''}`}
-                  style={{ backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF' }}
+                  style={{
+                    backgroundColor: isDark ? '#1C1C1E' : '#FFFFFF',
+                    marginHorizontal: 16,
+                  }}
                 >
                   <Pressable
                     style={({ pressed }) => [

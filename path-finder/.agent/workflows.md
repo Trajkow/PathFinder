@@ -7,7 +7,7 @@ Every feature is developed through a disciplined 4-phase cycle. No phase is skip
 ```
 ┌──────────────────────────────────────────────────┐
 │                                                  │
-│   1. PROMPT    →   2. GENERATE   →   3. REVIEW  │
+│   1. PROMPT    →   2. GENERATE   →   3. REVIEW   │
 │       ↑                                  │       │
 │       └──────────── 4. REFINE ◄──────────┘       │
 │                                                  │

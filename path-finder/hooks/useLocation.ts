@@ -32,7 +32,7 @@ interface UseLocationReturn {
 const LOCATION_TIMEOUT_MS = 15_000;
 
 /** Accuracy level for the initial map-centering request. */
-const LOCATION_ACCURACY = Location.Accuracy.Balanced;
+const LOCATION_ACCURACY = Location.Accuracy.Low;
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 
@@ -82,16 +82,26 @@ export function useLocation(): UseLocationReturn {
 
     try {
       // ── 1. Request foreground permission ──────────────────────────────
-      const { status } = await Location.requestForegroundPermissionsAsync();
+      // Always request — this shows the native OS dialog when undetermined,
+      // and returns 'denied' instantly on Android if 'Don't ask again' was set.
+      // Race against a timeout so a stuck dialog never hangs the loading screen.
+      const permissionRace = await Promise.race([
+        Location.requestForegroundPermissionsAsync(),
+        new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), LOCATION_TIMEOUT_MS),
+        ),
+      ]);
 
       if (!isMounted.current) return;
 
-      if (status !== Location.PermissionStatus.GRANTED) {
+      const permStatus = permissionRace?.status ?? Location.PermissionStatus.DENIED;
+
+      if (permStatus !== Location.PermissionStatus.GRANTED) {
         setIsPermissionGranted(false);
         setError(
-          status === Location.PermissionStatus.DENIED
+          permStatus === Location.PermissionStatus.DENIED
             ? 'Location permission was denied. Open Settings to enable it.'
-            : 'Location access is restricted on this device.'
+            : 'Location access is restricted on this device.',
         );
         setIsLoading(false);
         return;
@@ -112,12 +122,38 @@ export function useLocation(): UseLocationReturn {
         return;
       }
 
-      // ── 3. Fetch one-shot position ────────────────────────────────────
-      const position = await Location.getCurrentPositionAsync({
-        accuracy: LOCATION_ACCURACY,
-      });
+      // ── 3. Fetch position ────────────────────────────────────────────
+      // Try the cached last-known position first (instant, no GPS warm-up).
+      // Fall back to getCurrentPositionAsync with a timeout race so we
+      // never hang on a cold GPS start.
+      let position: Location.LocationObject | null = null;
+
+      try {
+        position = await Location.getLastKnownPositionAsync();
+      } catch {
+        // getLastKnownPositionAsync can throw on some Android OEMs — ignore.
+      }
+
+      if (!position) {
+        // No cache — do a live fix, but race against a timeout.
+        const livePosition = await Promise.race([
+          Location.getCurrentPositionAsync({ accuracy: LOCATION_ACCURACY }),
+          new Promise<null>((resolve) =>
+            setTimeout(() => resolve(null), LOCATION_TIMEOUT_MS),
+          ),
+        ]);
+        position = livePosition;
+      }
 
       if (!isMounted.current) return;
+
+      if (!position) {
+        setError(
+          'Unable to determine your location. Make sure GPS is enabled and try again.',
+        );
+        setIsLoading(false);
+        return;
+      }
 
       setCurrentLocation({
         latitude: position.coords.latitude,

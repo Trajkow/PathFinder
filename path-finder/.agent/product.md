@@ -86,4 +86,4 @@ Home Screen (Map)
 | **Tracking**    | GPS update interval: 1-3s (adaptive to speed)            |
 | **Storage**     | Efficient coordinate compression for sessions > 1 hour   |
 | **UX**          | Zero modals/popups during active tracking                |
-| **Reliability** | Auto-save coordinates on crash; recoverable sessions      |
+| **Reliability** | Auto-save coordinates on crash; recoverable sessions     |

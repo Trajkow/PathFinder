@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { Coordinate } from '@/types/activity';
+import type { TrackingDraft } from '@/services/db';
 
 // ─── Haversine distance ───────────────────────────────────────────────────────
 
@@ -34,6 +35,10 @@ function haversineMeters(
 interface TrackingState {
   /** Whether a route is actively being recorded. */
   isTracking: boolean;
+  /** `true` when the session is alive but GPS signal was lost (permission revoked, GPS disabled). */
+  isPaused: boolean;
+  /** Human-readable reason the session was paused. `null` when not paused. */
+  pauseReason: string | null;
   /** Ordered list of GPS fixes captured during the current session. */
   routeCoordinates: Coordinate[];
   /** Accumulated distance in **meters** for the current session. */
@@ -49,10 +54,19 @@ interface TrackingActions {
    */
   startTracking: () => void;
   /**
-   * Pause/stop recording without clearing accumulated data.
+   * Stop recording and mark the session as complete.
    * Call this before persisting the session via `saveActivity`.
    */
   stopTracking: () => void;
+  /**
+   * Pause the session without stopping it — route data is preserved.
+   * Called automatically when the heartbeat detects GPS/permission loss.
+   */
+  pauseTracking: (reason: string) => void;
+  /**
+   * Resume a paused session. The watcher will restart in `useTracking`.
+   */
+  resumeTracking: () => void;
   /**
    * Reset all tracking state back to the initial/idle values.
    * Typically called after the session has been saved to the DB.
@@ -60,9 +74,19 @@ interface TrackingActions {
   resetTracking: () => void;
   /**
    * Append a new GPS fix to the route and accumulate the Haversine distance.
-   * No-op when `isTracking` is `false`.
+   * No-op when `isTracking` is `false` or `isPaused` is `true`.
    */
   addCoordinate: (coord: Coordinate) => void;
+  /**
+   * Hydrate the store from a persisted draft (recovered after an app kill).
+   * Sets `isTracking = true` and `isPaused = true` so the user must explicitly resume.
+   */
+  restoreFromDraft: (draft: TrackingDraft) => void;
+  /**
+   * Returns a snapshot of the current session in draft format for periodic flushing.
+   * Returns `null` if no session is active.
+   */
+  getDraftSnapshot: () => TrackingDraft | null;
 }
 
 type TrackingStore = TrackingState & TrackingActions;
@@ -71,6 +95,8 @@ type TrackingStore = TrackingState & TrackingActions;
 
 const INITIAL_STATE: TrackingState = {
   isTracking: false,
+  isPaused: false,
+  pauseReason: null,
   routeCoordinates: [],
   totalDistanceMeters: 0,
   startTime: null,
@@ -84,6 +110,8 @@ export const useTrackingStore = create<TrackingStore>((set, get) => ({
   startTracking: () => {
     set({
       isTracking: true,
+      isPaused: false,
+      pauseReason: null,
       routeCoordinates: [],
       totalDistanceMeters: 0,
       startTime: new Date(),
@@ -91,7 +119,15 @@ export const useTrackingStore = create<TrackingStore>((set, get) => ({
   },
 
   stopTracking: () => {
-    set({ isTracking: false });
+    set({ isTracking: false, isPaused: false, pauseReason: null });
+  },
+
+  pauseTracking: (reason: string) => {
+    set({ isPaused: true, pauseReason: reason });
+  },
+
+  resumeTracking: () => {
+    set({ isPaused: false, pauseReason: null });
   },
 
   resetTracking: () => {
@@ -99,8 +135,8 @@ export const useTrackingStore = create<TrackingStore>((set, get) => ({
   },
 
   addCoordinate: (coord: Coordinate) => {
-    const { isTracking, routeCoordinates, totalDistanceMeters } = get();
-    if (!isTracking) return;
+    const { isTracking, isPaused, routeCoordinates, totalDistanceMeters } = get();
+    if (!isTracking || isPaused) return;
 
     const last = routeCoordinates.at(-1);
     const delta = last ? haversineMeters(last, coord) : 0;
@@ -109,5 +145,28 @@ export const useTrackingStore = create<TrackingStore>((set, get) => ({
       routeCoordinates: [...routeCoordinates, coord],
       totalDistanceMeters: totalDistanceMeters + delta,
     });
+  },
+
+  restoreFromDraft: (draft: TrackingDraft) => {
+    set({
+      isTracking: true,
+      isPaused: false,
+      pauseReason: null,
+      routeCoordinates: draft.routeCoordinates,
+      totalDistanceMeters: draft.totalDistanceMeters,
+      startTime: new Date(draft.startTime),
+    });
+  },
+
+  getDraftSnapshot: () => {
+    const { isTracking, routeCoordinates, totalDistanceMeters, startTime } = get();
+    if (!isTracking || !startTime) return null;
+
+    return {
+      startTime: startTime.toISOString(),
+      routeCoordinates,
+      totalDistanceMeters,
+      savedAt: new Date().toISOString(),
+    };
   },
 }));
